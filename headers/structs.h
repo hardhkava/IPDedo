@@ -1,13 +1,17 @@
 #ifndef STRUCTS_H
 #define STRUCTS_H
 
+#define domainLength 100
+#define ipLength 16
+#define cacheSize 100
+
 #include <pthread.h>
 
-enum Role{ADMIN, USER};
+enum Role{USER, ADMIN};
 
 struct DNSRecord{
-	char domain[100]; //eg google.co.in
-	char ip[16]; //12 digits, 3 dots, 1 \0
+	char domain[domainLength]; //eg google.co.in
+	char ip[ipLength]; //12 digits, 3 dots, 1 \0
 };
 
 struct CacheEntry{
@@ -16,16 +20,14 @@ struct CacheEntry{
 };
 
 struct DNSCache{
-	struct CacheEntry entries[100];
+	struct CacheEntry entries[cacheSize];
 	pthread_rwlock_t lock;//allows multiple threads to read, but only one to write
 };
 
 struct ClientDetails{
 	int socketFD;
 	enum Role role;
-	char clientIP[16];
+	char clientIP[ipLength];
+	struct DNSCache* cache;
 };
 #endif
-
-
-

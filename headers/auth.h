@@ -3,8 +3,10 @@
 
 #include "structs.h"
 
-enum Role authenticate(const char* username, const char* password); //enum function which will return role based on username
+int authenticate(const char* username, const char* password); //return 1 if admin exist and creds match, 0 if not
 
-int allowed(enum Role role, const char* operation) //return 1 if operation allowed for that role, 0 if not
+int registerAdmin(const char* username, const char* password);// adds new admin to admins.csv
 
-//#endif
+int allowed(enum Role role, const char* operation); //return 1 if operation allowed for that role, 0 if not
+
+#endif
