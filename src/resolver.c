@@ -67,8 +67,8 @@ void* handleClient(void* arg){
 		strcpy(response, "Password: ");
 		send(client->socketFD, response, strlen(response), 0);
 
-		bytesRead = recv(client->socketFD, buffer, sizeof(buffer) - 1, 0):
-			if(bytesRead <= 0) goto cleanup;
+		bytesRead = recv(client->socketFD, buffer, sizeof(buffer) - 1, 0);
+		if(bytesRead <= 0) goto cleanup;
 
 		buffer[strcspn(buffer, "\r\n")] = '\0';
 
@@ -77,7 +77,7 @@ void* handleClient(void* arg){
 
 		if (authenticate(username, password) == 0) {
             		strcpy(response, "Authentication failed,disconnecting...\n");
-            		send(ctx->socketFD, response, strlen(response), 0);
+            		send(client->socketFD, response, strlen(response), 0);
             		goto cleanup;
         	}
 
@@ -90,5 +90,84 @@ void* handleClient(void* arg){
 		strcpy(response, "Welcome user ji\n");
 		send(client->socketFD, response, strlen(response), 0);
 	}
+
+	
+
+
+	/*interactive command loop*/
+	while(1){
+		if(client->role == ADMIN) strcpy(response, "\nCommands: QUERY <domain>, ADD <domain> <ip>, DELETE <domain>, QUIT\n> ");
+		else strcpy(response, "\nCommands: QUERY <domain>, QUIT\n> ");
+
+		send(client->socketFD, response, strlen(response), 0);
+
+		bytesRead = recv(client->socketFD, buffer, sizeof(buffer) - 1, 0);
+		if(bytesRead <= 0) break;
+		buffer[bytesRead] = '\0';
+		buffer[strcspn(buffer, "\r\n")] = '\0';
+
+		char cmd[20], arg1[100], arg2[20];
+		int parsed = sscanf(buffer, "%19s %99s %19s", cmd, arg1, arg2);
+
+		if(parsed >= 1 && strcmp(cmd, "QUIT") == 0) break;
+
+		else if(parsed >= 2 && strcmp(cmd, "QUERY") == 0){
+			if(allowed(client->role, "query") == 0) strcpy(response, "permission denied\n");
+
+			else{
+				char ip[ipLength];
+				if(resolve(client->cache, arg1, ip)) sprintf(response, "Found %s -> %s\n", arg1, ip);
+				else sprintf(response, "ip not found %s\n", arg1);
+			}
+
+			send(client->socketFD, response, strlen(response), 0);
+
+		}
+
+		else if(parsed == 3 && strcmp(cmd, "ADD") == 0){
+			if(allowed(client->role, "addRecord") == 0) strcpy(response, "permission denied\n");
+			else{
+				struct DNSRecord rec;
+				strcpy(rec.domain, arg1);
+				strcpy(rec.ip, arg2);
+
+				saveRecord(&rec);
+				cacheInsert(client->cache, &rec);
+				
+				strcpy(response, "Record added\n");
+			}
+
+			send(client->socketFD, response, strlen(response), 0);
+		}
+
+		else if(parsed >= 2 && strcmp(cmd, "DELETE") == 0){
+			if(allowed(client->role, "deleteRecord") == 0) strcpy(response, "permission denied\n");
+			
+			else{
+				if(deleteRecord(arg1) == 0){
+					cacheInvalidate(client->cache, arg1);
+					strcpy(response, "Record deleted\n");
+				}
+				else strcpy(response, "record not found to delete\n");
+			}
+
+			send(client->socketFD, response, strlen(response), 0);
+
+		}
+
+
+		else{
+			strcpy(response, "Invalid command\n");
+			send(client->socketFD, response, strlen(response), 0);
+		}
+	}
+
+cleanup:
+	close(client->socketFD);
+	free(client);
+
+	return NULL;
+}	
+		
 
 
