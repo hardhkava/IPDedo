@@ -4,10 +4,13 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <pthread.h>
+#include <semaphore.h>
 #include "resolver.h"
 #include "auth.h"
 #include "cache.h"
 #include "records.h"
+
+extern sem_t clientSem;
 
 int resolve(struct DNSCache* cache, const char* domain, char* res){
 	struct DNSRecord record;
@@ -165,6 +168,7 @@ void* handleClient(void* arg){
 cleanup:
 	close(client->socketFD);
 	free(client);
+	sem_post(&clientSem); /*releasing the slot*/
 
 	return NULL;
 }	
