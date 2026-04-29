@@ -99,7 +99,7 @@ void* handleClient(void* arg){
 
 	/*interactive command loop*/
 	while(1){
-		if(client->role == ADMIN) strcpy(response, "\nCommands: QUERY <domain>, ADD <domain> <ip>, DELETE <domain>, QUIT\n> ");
+		if(client->role == ADMIN) strcpy(response, "\nCommands: REGISTER <user> <pass>, QUERY <domain>, ADD <domain> <ip>, DELETE <domain>, QUIT\n> ");
 		else strcpy(response, "\nCommands: QUERY <domain>, QUIT\n> ");
 
 		send(client->socketFD, response, strlen(response), 0);
@@ -142,6 +142,19 @@ void* handleClient(void* arg){
 
 			send(client->socketFD, response, strlen(response), 0);
 		}
+
+		else if(parsed == 3 && strcmp(cmd, "REGISTER") == 0){
+            		if(client->role != ADMIN) strcpy(response, "permission denied\n");
+            		else{
+                		int result = registerAdmin(arg1, arg2);
+                		if (result == 0) strcpy(response, "New admin registered successfully\n");
+				else if (result == -1) strcpy(response, "Username already exists\n");
+                		else strcpy(response, "Error opening admins.csv\n");
+			}
+
+            		send(client->socketFD, response, strlen(response), 0);
+        	}
+
 
 		else if(parsed >= 2 && strcmp(cmd, "DELETE") == 0){
 			if(allowed(client->role, "deleteRecord") == 0) strcpy(response, "permission denied\n");
