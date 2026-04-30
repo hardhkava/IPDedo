@@ -8,6 +8,22 @@
 
 static pthread_mutex_t adminMutex = PTHREAD_MUTEX_INITIALIZER;
 
+void authInit(void){
+	pthread_mutex_lock(&adminMutex);
+	FILE* fp = fopen("admins.csv", "r");
+	if(fp == NULL){
+		fp = fopen("admins.csv", "w");
+		if(fp != NULL){
+			fprintf(fp, "admin,password\n");
+			fclose(fp);
+			printf("[Auth] Created admins.csv with default super admin.\n");
+		}
+	} else {
+		fclose(fp);
+	}
+	pthread_mutex_unlock(&adminMutex);
+}
+
 int authenticate(const char* username, const char* password){
 	pthread_mutex_lock(&adminMutex);
 

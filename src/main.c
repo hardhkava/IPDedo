@@ -15,6 +15,7 @@
 #include "cache.h"
 #include "resolver.h"
 #include "logger.h"
+#include "auth.h"
 
 #define COLOR_GREEN "\033[1;32m"
 #define COLOR_RED   "\033[1;31m"
@@ -71,6 +72,7 @@ int main(){
 	/*init semaphore and cache*/
 	sem_init(&clientSem, 0, maxClients);
 	cacheInit(&serverCache);
+	authInit();
 
 	/*create named pipe for ipc (ignore error if it already exists)*/
 	mkfifo(pipePath, 0666);

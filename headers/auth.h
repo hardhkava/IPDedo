@@ -9,4 +9,6 @@ int registerAdmin(const char* username, const char* password);// adds new admin 
 
 int allowed(enum Role role, const char* operation); //return 1 if operation allowed for that role, 0 if not
 
+void authInit(void);
+
 #endif
