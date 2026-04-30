@@ -9,6 +9,11 @@
 #include "auth.h"
 #include "cache.h"
 #include "records.h"
+#include "logger.h"
+#include "resolver.h"
+#include "upstream.h"
+
+#define pipePath "/tmp/dns_pipe"
 
 extern sem_t clientSem;
 
@@ -18,17 +23,25 @@ int resolve(struct DNSCache* cache, const char* domain, char* res){
 	/*check cache*/
 	if(cacheLookup(cache, domain, &record)){
 		strcpy(res, record.ip);
-		return 1;
+		return 1; /*found in cache */
 	}
 
 	/*check records.csv*/
 	if(findRecord(domain, &record)){
 		strcpy(res, record.ip);
-		cacheInsert(cache, &record); /*add to cache cuz it missed*/
-		return 1;
+		cacheInsert(cache, &record);
+		return 2; /*found in records */
 	}
 
-	return 0;
+	/*check upstream dns 8.8.8.8 via udp*/
+	if(fetchFromUpstream(domain, res)){
+		strcpy(record.domain, domain);
+		strcpy(record.ip, res);
+		cacheInsert(cache, &record);
+		return 3; /*found upstream */
+	}
+
+	return 0; /*miss */
 }
 
 
@@ -78,29 +91,29 @@ void* handleClient(void* arg){
 		char password[100];
 		strcpy(password, buffer);
 
-		if (authenticate(username, password) == 0) {
+		if (authenticate(username, password) != 1) {
             		strcpy(response, "Authentication failed,disconnecting...\n");
             		send(client->socketFD, response, strlen(response), 0);
             		goto cleanup;
         	}
 
 		strcpy(response, "Authentication successful, welcome admin ji\n");
-		send(client->socketFD, response, strlen(response), 0);
 	}
 
 	else{
 		client->role = USER;
 		strcpy(response, "Welcome user ji\n");
-		send(client->socketFD, response, strlen(response), 0);
 	}
 
 	
 
-
 	/*interactive command loop*/
 	while(1){
-		if(client->role == ADMIN) strcpy(response, "\nCommands: REGISTER <user> <pass>, QUERY <domain>, ADD <domain> <ip>, DELETE <domain>, QUIT\n> ");
-		else strcpy(response, "\nCommands: QUERY <domain>, QUIT\n> ");
+		char prompt[512];
+		if(client->role == ADMIN) strcpy(prompt, "\nCommands: REGISTER <user> <pass>, QUERY <domain>, ADD <domain> <ip>, DELETE <domain>, QUIT\n> ");
+		else strcpy(prompt, "\nCommands: QUERY <domain>, QUIT\n> ");
+
+		strcat(response, prompt);
 
 		send(client->socketFD, response, strlen(response), 0);
 
@@ -116,31 +129,40 @@ void* handleClient(void* arg){
 
 		else if(parsed >= 2 && strcmp(cmd, "QUERY") == 0){
 			if(allowed(client->role, "query") == 0) strcpy(response, "permission denied\n");
-
 			else{
 				char ip[ipLength];
-				if(resolve(client->cache, arg1, ip)) sprintf(response, "Found %s -> %s\n", arg1, ip);
-				else sprintf(response, "ip not found %s\n", arg1);
+				int status = resolve(client->cache, arg1, ip);
+				
+				if(status == 1){
+					sprintf(response, "Found %s -> %s Source: DNS cache\n", arg1, ip);
+					logEvent(pipePath, arg1, client->clientIP, "HIT (Cache)");
+				}
+				else if(status == 2){
+					sprintf(response, "Found %s -> %s Source: Records.csv\n", arg1, ip);
+					logEvent(pipePath, arg1, client->clientIP, "HIT (Records)");
+				}
+				else if(status == 3){
+					sprintf(response, "Found %s -> %s Source: 8.8.8.8 UDP QUery\n", arg1, ip);
+					logEvent(pipePath, arg1, client->clientIP, "HIT (Upstream)");
+				}
+				else{
+					sprintf(response, "ip not found %s\n", arg1);
+					logEvent(pipePath, arg1, client->clientIP, "MISS");
+				}
 			}
-
-			send(client->socketFD, response, strlen(response), 0);
-
 		}
-
 		else if(parsed == 3 && strcmp(cmd, "ADD") == 0){
 			if(allowed(client->role, "addRecord") == 0) strcpy(response, "permission denied\n");
 			else{
 				struct DNSRecord rec;
 				strcpy(rec.domain, arg1);
 				strcpy(rec.ip, arg2);
-
 				saveRecord(&rec);
 				cacheInsert(client->cache, &rec);
 				
 				strcpy(response, "Record added\n");
+				logEvent(pipePath, arg1, client->clientIP, "ADDED RECORD");
 			}
-
-			send(client->socketFD, response, strlen(response), 0);
 		}
 
 		else if(parsed == 3 && strcmp(cmd, "REGISTER") == 0){
@@ -152,29 +174,24 @@ void* handleClient(void* arg){
                 		else strcpy(response, "Error opening admins.csv\n");
 			}
 
-            		send(client->socketFD, response, strlen(response), 0);
         	}
 
 
 		else if(parsed >= 2 && strcmp(cmd, "DELETE") == 0){
 			if(allowed(client->role, "deleteRecord") == 0) strcpy(response, "permission denied\n");
-			
 			else{
 				if(deleteRecord(arg1) == 0){
 					cacheInvalidate(client->cache, arg1);
 					strcpy(response, "Record deleted\n");
+					logEvent(pipePath, arg1, client->clientIP, "DELETED RECORD");
 				}
 				else strcpy(response, "record not found to delete\n");
 			}
-
-			send(client->socketFD, response, strlen(response), 0);
-
 		}
 
 
 		else{
 			strcpy(response, "Invalid command\n");
-			send(client->socketFD, response, strlen(response), 0);
 		}
 	}
 
@@ -185,6 +202,4 @@ cleanup:
 
 	return NULL;
 }	
-		
-
 
