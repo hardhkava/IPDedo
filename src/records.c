@@ -12,7 +12,6 @@ int findRecord(const char* domain, struct DNSRecord *res){
 	FILE* fp = fopen("records.csv", "r");
 	if(fp == NULL){
 		pthread_mutex_unlock(&recordMutex);
-		printf("Error opening file\n");
 		return 0;
 	}
 
@@ -46,7 +45,6 @@ int saveRecord(const struct DNSRecord* record){
 	FILE* fp = fopen("records.csv", "a");
 	if(fp == NULL){
 		pthread_mutex_unlock(&recordMutex);
-		printf("Error opening file\n");
 		return 0;
 	}
 
@@ -64,7 +62,6 @@ int deleteRecord(const char* domain){
 	FILE* fp = fopen("records.csv", "r");
 	if(fp == NULL){
                 pthread_mutex_unlock(&recordMutex);
-                printf("Error opening file\n");
                 return -2;
         }
 	
@@ -73,7 +70,6 @@ int deleteRecord(const char* domain){
 	if(tempFP == NULL){
 		fclose(fp);
                 pthread_mutex_unlock(&recordMutex);
-                printf("Error opening file\n");
                 return -2;
         }
 
