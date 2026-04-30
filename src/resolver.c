@@ -15,6 +15,13 @@
 
 #define pipePath "/tmp/dns_pipe"
 
+#define COLOR_GREEN "\033[1;32m"
+#define COLOR_RED   "\033[1;31m"
+#define COLOR_CYAN  "\033[1;36m"
+#define COLOR_YELLOW "\033[1;33m"
+#define COLOR_RESET "\033[0m"
+#define CLEAR_SCREEN "\033[H\033[J"
+
 extern sem_t clientSem;
 
 int resolve(struct DNSCache* cache, const char* domain, char* res){
@@ -52,8 +59,14 @@ void* handleClient(void* arg){
 	int bytesRead;
 
 
-	/*Role selection prompt*/
-	strcpy(response, "Select your role:\n 1->User \n 2->Admin\n>");
+	/*Role selection prompt with ASCII art and clear screen*/
+	strcpy(response, CLEAR_SCREEN COLOR_CYAN 
+		"  ___ ___  ___         _     \n"
+		" |_ _| _ \\|   \\ ___ __| |___ \n"
+		"  | ||  _/| |) / -_) _` / _ \\\n"
+		" |___|_|  |___/\\___\\__,_\\___/\n"
+		COLOR_RESET "\nWelcome to IPDedo DNS Server!\n\n"
+		"Select your role:\n 1->User \n 2->Admin\n> ");
 	send(client->socketFD, response, strlen(response), 0);
 
 	bytesRead = recv(client->socketFD, buffer, sizeof(buffer) - 1, 0);
@@ -92,17 +105,17 @@ void* handleClient(void* arg){
 		strcpy(password, buffer);
 
 		if (authenticate(username, password) != 1) {
-            		strcpy(response, "Authentication failed,disconnecting...\n");
+            		strcpy(response, COLOR_RED "Authentication failed, disconnecting...\n" COLOR_RESET);
             		send(client->socketFD, response, strlen(response), 0);
             		goto cleanup;
         	}
 
-		strcpy(response, "Authentication successful, welcome admin ji\n");
+		strcpy(response, COLOR_GREEN "Authentication successful, welcome Admin!" COLOR_RESET);
 	}
 
 	else{
 		client->role = USER;
-		strcpy(response, "Welcome user ji\n");
+		strcpy(response, COLOR_GREEN "Welcome User!" COLOR_RESET);
 	}
 
 	
@@ -110,8 +123,8 @@ void* handleClient(void* arg){
 	/*interactive command loop*/
 	while(1){
 		char prompt[512];
-		if(client->role == ADMIN) strcpy(prompt, "\nCommands: REGISTER <user> <pass>, QUERY <domain>, ADD <domain> <ip>, DELETE <domain>, QUIT\n> ");
-		else strcpy(prompt, "\nCommands: QUERY <domain>, QUIT\n> ");
+		if(client->role == ADMIN) strcpy(prompt, COLOR_YELLOW "\nCommands: REGISTER <user> <pass>, QUERY <domain>, ADD <domain> <ip>, DELETE <domain>, QUIT\n> " COLOR_RESET);
+		else strcpy(prompt, COLOR_YELLOW "\nCommands: QUERY <domain>, QUIT\n> " COLOR_RESET);
 
 		strcat(response, prompt);
 
@@ -134,19 +147,19 @@ void* handleClient(void* arg){
 				int status = resolve(client->cache, arg1, ip);
 				
 				if(status == 1){
-					sprintf(response, "Found %s -> %s Source: DNS cache\n", arg1, ip);
+					sprintf(response, COLOR_GREEN "Found %s -> %s [Source: Cache]" COLOR_RESET, arg1, ip);
 					logEvent(pipePath, arg1, client->clientIP, "HIT (Cache)");
 				}
 				else if(status == 2){
-					sprintf(response, "Found %s -> %s Source: Records.csv\n", arg1, ip);
+					sprintf(response, COLOR_GREEN "Found %s -> %s [Source: Records.csv]" COLOR_RESET, arg1, ip);
 					logEvent(pipePath, arg1, client->clientIP, "HIT (Records)");
 				}
 				else if(status == 3){
-					sprintf(response, "Found %s -> %s Source: 8.8.8.8 UDP QUery\n", arg1, ip);
+					sprintf(response, COLOR_GREEN "Found %s -> %s [Source: 8.8.8.8 UDP]" COLOR_RESET, arg1, ip);
 					logEvent(pipePath, arg1, client->clientIP, "HIT (Upstream)");
 				}
 				else{
-					sprintf(response, "ip not found %s\n", arg1);
+					sprintf(response, COLOR_RED "IP not found for %s" COLOR_RESET, arg1);
 					logEvent(pipePath, arg1, client->clientIP, "MISS");
 				}
 			}
@@ -160,7 +173,7 @@ void* handleClient(void* arg){
 				saveRecord(&rec);
 				cacheInsert(client->cache, &rec);
 				
-				strcpy(response, "Record added\n");
+				strcpy(response, COLOR_GREEN "Record added successfully" COLOR_RESET);
 				logEvent(pipePath, arg1, client->clientIP, "ADDED RECORD");
 			}
 		}
@@ -169,9 +182,9 @@ void* handleClient(void* arg){
             		if(client->role != ADMIN) strcpy(response, "permission denied\n");
             		else{
                 		int result = registerAdmin(arg1, arg2);
-                		if (result == 0) strcpy(response, "New admin registered successfully\n");
-				else if (result == -1) strcpy(response, "Username already exists\n");
-                		else strcpy(response, "Error opening admins.csv\n");
+                		if (result == 0) strcpy(response, COLOR_GREEN "New admin registered successfully" COLOR_RESET);
+				else if (result == -1) strcpy(response, COLOR_RED "Username already exists" COLOR_RESET);
+                		else strcpy(response, COLOR_RED "Error opening admins.csv" COLOR_RESET);
 			}
 
         	}
@@ -182,16 +195,16 @@ void* handleClient(void* arg){
 			else{
 				if(deleteRecord(arg1) == 0){
 					cacheInvalidate(client->cache, arg1);
-					strcpy(response, "Record deleted\n");
+					strcpy(response, COLOR_GREEN "Record deleted successfully" COLOR_RESET);
 					logEvent(pipePath, arg1, client->clientIP, "DELETED RECORD");
 				}
-				else strcpy(response, "record not found to delete\n");
+				else strcpy(response, COLOR_RED "Record not found to delete" COLOR_RESET);
 			}
 		}
 
 
 		else{
-			strcpy(response, "Invalid command\n");
+			strcpy(response, COLOR_RED "Invalid command" COLOR_RESET);
 		}
 	}
 

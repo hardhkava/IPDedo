@@ -16,6 +16,13 @@
 #include "resolver.h"
 #include "logger.h"
 
+#define COLOR_GREEN "\033[1;32m"
+#define COLOR_RED   "\033[1;31m"
+#define COLOR_CYAN  "\033[1;36m"
+#define COLOR_YELLOW "\033[1;33m"
+#define COLOR_RESET "\033[0m"
+#define CLEAR_SCREEN "\033[H\033[J"
+
 #define PORT 5353
 #define maxClients 50
 #define pipePath "/tmp/dns_pipe"
@@ -30,7 +37,7 @@ int serverFD;
 pid_t loggerPid = -1;
 
 void handleSigint(int sig){
-	printf("\n[Server] Caught SIGINT (Ctrl+C). Shutting down gracefully...\n");
+	printf(COLOR_YELLOW "\n[Server] Caught SIGINT (Ctrl+C). Shutting down gracefully...\n" COLOR_RESET);
 
 	/*kill logger process*/
 	if(loggerPid > 0){
@@ -48,7 +55,7 @@ void handleSigint(int sig){
 	cacheDestroy(&serverCache);
 	sem_destroy(&clientSem);
 
-	printf("[Server] Cleanup complete. Goodbye!\n");
+	printf(COLOR_GREEN "[Server] Cleanup complete. Goodbye!\n" COLOR_RESET);
 	exit(0);
 }
 
@@ -110,8 +117,15 @@ int main(){
 		exit(1);
 	}
 
-	printf("IPDedo DNS Server running on port %d\n", PORT);
-	printf("Press Ctrl+C to safely shut down the server.\n");
+	printf(CLEAR_SCREEN COLOR_CYAN 
+		"  ___ ___ ___         _      ___ ___ _____   _____ ___ \n"
+		" |_ _| _ \\   \\ ___ __| |___ / __| __| _ \\ \\ / / __| _ \\\n"
+		"  | ||  _/ |) / -_) _` / _ \\\\__ \\ _||   /\\ V /| _||   /\n"
+		" |___|_| |___/\\___\\__,_\\___/|___/___|_|_\\ \\_/ |___|_|_\\\n"
+		COLOR_RESET "\n");
+
+	printf(COLOR_CYAN "IPDedo DNS Server running on port %d\n" COLOR_RESET, PORT);
+	printf(COLOR_YELLOW "Press Ctrl+C to safely shut down the server.\n\n" COLOR_RESET);
 
 
 	/*accept loop*/
@@ -125,7 +139,7 @@ int main(){
 			continue;
 		}
 
-		printf("new client connected: %s\n", inet_ntoa(clientAddr.sin_addr));
+		printf(COLOR_GREEN "new client connected: %s\n" COLOR_RESET, inet_ntoa(clientAddr.sin_addr));
 
 		/*creating client details struct*/
 		struct ClientDetails* client = malloc(sizeof(struct ClientDetails));

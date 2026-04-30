@@ -9,3 +9,8 @@ bin/
 *.swp
 .vscode/
 .idea/
+records.csv
+server.log
+server
+client
+admins.csv
